@@ -1,0 +1,10 @@
+# --- Data & ML ---
+pandas
+numpy
+scikit-learn
+joblib
+
+# --- Backend API ---
+fastapi
+uvicorn[standard]
+pydantic

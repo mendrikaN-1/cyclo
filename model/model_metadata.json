@@ -1,0 +1,15 @@
+{
+  "model_name": "LinearRegression",
+  "mae_days": 2.466,
+  "features": [
+    "cycle_precedent",
+    "moyenne_3_derniers",
+    "ecart_type_3_derniers",
+    "cycle_number"
+  ],
+  "target": "LengthofCycle",
+  "global_mean_cycle_length": 29.22,
+  "global_std_cycle_length": 3.87,
+  "default_luteal_phase_days": 14,
+  "training_examples": 1506
+}
