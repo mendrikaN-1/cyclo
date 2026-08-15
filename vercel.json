@@ -1,31 +1,24 @@
 {
-  "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "backend/main.py",
-      "use": "@vercel/python"
+      "source": "/cron/send-reminders",
+      "destination": "/api/main.py"
     },
     {
-      "src": "frontend/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/cron/send-reminders",
-      "dest": "backend/main.py"
+      "source": "/predict",
+      "destination": "/api/main.py"
     },
     {
-      "src": "/predict(.*)",
-      "dest": "backend/main.py"
+      "source": "/send-reminder",
+      "destination": "/api/main.py"
     },
     {
-      "src": "/send-reminder",
-      "dest": "backend/main.py"
+      "source": "/docs",
+      "destination": "/api/main.py"
     },
     {
-      "src": "/(.*)",
-      "dest": "frontend/$1"
+      "source": "/openapi.json",
+      "destination": "/api/main.py"
     }
   ],
   "crons": [
