@@ -1,38 +1,18 @@
 """
-API FastAPI pour la prédiction de cycle menstruel, fenêtre d'ovulation et phases
-de fertilité.
-
-IMPORTANT — Différence avec les versions précédentes :
-Le modèle (régression linéaire) est maintenant codé EN DUR ci-dessous, sous forme
-de coefficients numériques, au lieu d'être chargé depuis un fichier `.joblib` externe.
-
-Pourquoi ce choix : sur un environnement serverless comme Vercel, charger un fichier
-externe au démarrage (joblib.load) est une source fréquente de plantage silencieux
-(FUNCTION_INVOCATION_FAILED) — soit parce que le fichier n'est pas inclus dans le
-paquet déployé, soit à cause d'une incompatibilité de version entre scikit-learn
-utilisé à l'entraînement et celui installé sur le serveur au moment du déploiement.
-
-Comme notre modèle est une simple régression linéaire (4 coefficients + une
-constante), il est largement aussi simple et beaucoup plus robuste de le
-recalculer nous-mêmes avec une formule mathématique directe. Zéro dépendance
-fichier, zéro risque de désynchronisation de version.
-
-Ces coefficients ont été extraits une fois pour toutes depuis le modèle entraîné
-dans model/train_model.py (voir model/model_metadata.json pour la trace complète).
+API FastAPI — Cyclo v5 avec Rappel Automatique d'Email (2 jours avant les règles)
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Header, Security
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, EmailStr
 from datetime import date, timedelta
 from typing import List, Optional
 import numpy as np
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
+from supabase import create_client, Client
 
-app = FastAPI(title="API Prédiction Cycle Menstruel & Analytics", version="3.0")
+app = FastAPI(title="API Prédiction Cycle Menstruel & Automatisations", version="5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,40 +21,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# =====================================================================
-# MODÈLE : coefficients de la régression linéaire, extraits une fois
-# depuis model/train_model.py. Ordre des features :
-# [cycle_precedent, moyenne_3_derniers, ecart_type_3_derniers, cycle_number]
-# =====================================================================
 MODEL_COEFFICIENTS = np.array([0.30558796, 0.3133756, 0.03538975, -0.02215476])
 MODEL_INTERCEPT = 11.212948098682684
-MODEL_MAE_DAYS = 2.466  # Erreur moyenne mesurée sur les données de test
+MODEL_MAE_DAYS = 2.466
 
-DUREE_REGLES_DEFAUT = 5
 SURVIE_SPERMATOZOIDES = 5
 SURVIE_OVULE = 1
 DEFAULT_LUTEAL_PHASE_DAYS = 14
+DUREE_REGLES_MIN = 1
+DUREE_REGLES_MAX = 14
 
 
 def predire_duree_cycle(cycle_precedent, moyenne_3_derniers, ecart_type_3_derniers, cycle_number):
-    """Reproduit exactement model.predict() d'une LinearRegression scikit-learn."""
     features = np.array([cycle_precedent, moyenne_3_derniers, ecart_type_3_derniers, cycle_number])
     return float(np.dot(MODEL_COEFFICIENTS, features) + MODEL_INTERCEPT)
 
 
+# --- SCHÉMAS ---
+
+class CycleEntry(BaseModel):
+    date_debut: date = Field(..., description="Premier jour des règles.")
+    date_fin: date = Field(..., description="Dernier jour des règles (inclus).")
+
+
 class PredictionRequest(BaseModel):
-    dates_dernieres_regles: List[date] = Field(
-        ...,
-        description="Dates de début de règles passées, de la plus ancienne à la plus récente. Minimum 2 dates."
-    )
-    duree_regles: int = Field(
-        default=DUREE_REGLES_DEFAUT,
-        ge=1,
-        le=10,
-        description="Durée habituelle/réelle des règles en jours."
-    )
+    cycles: List[CycleEntry]
     user_email: Optional[EmailStr] = None
-    envoyer_email_rappel: bool = False
 
 
 class Phase(BaseModel):
@@ -100,6 +72,8 @@ class PredictionResponse(BaseModel):
     jour_actuel_cycle: int
     phase_actuelle: Phase
     jours_avant_prochaines_regles: int
+    compte_a_rebours: str
+    en_retard: bool
     phases: List[Phase]
     stats: StatsDashboard
     nombre_cycles_utilises: int
@@ -108,41 +82,17 @@ class PredictionResponse(BaseModel):
     avertissement: str
 
 
-def envoyer_email_notification(email_destinataire: str, date_regles_estimee: date):
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
+class ReminderRequest(BaseModel):
+    email: EmailStr
+    date_prochaines_regles: date
 
-    if not smtp_user or not smtp_password:
-        print(f"[SIMULATION EMAIL] Rappel programmé pour {email_destinataire} avant le {date_regles_estimee}")
-        return
 
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = smtp_user
-        msg['To'] = email_destinataire
-        msg['Subject'] = "Cyclo — Rappel de ton prochain cycle"
+class ReminderResponse(BaseModel):
+    success: bool
+    message: str
 
-        corps = f"""
-        Bonjour,
 
-        Selon vos enregistrements sur Cyclo, vos prochaines règles sont estimées pour le {date_regles_estimee.strftime('%d/%m/%Y')}.
-
-        Prenez soin de vous !
-        L'équipe Cyclo.
-        """
-        msg.attach(MIMEText(corps, 'plain'))
-
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.send_message(msg)
-        server.quit()
-        print(f"Email de notification envoyé avec succès à {email_destinataire}")
-    except Exception as e:
-        print(f"Erreur envoi email : {e}")
-
+# --- HELPER FUNCTIONS ---
 
 def calculer_features_depuis_historique(durees_cycles: List[float]) -> dict:
     cycle_precedent = durees_cycles[-1]
@@ -203,36 +153,90 @@ def construire_phases(
     return [p for p in phases if p.date_fin >= p.date_debut]
 
 
+def formater_compte_a_rebours(jours_avant: int) -> tuple[str, bool]:
+    if jours_avant > 0:
+        return f"J-{jours_avant}", False
+    elif jours_avant == 0:
+        return "Prévues aujourd'hui", False
+    else:
+        return f"En retard de {abs(jours_avant)} jour{'s' if abs(jours_avant) > 1 else ''}", True
+
+
+def envoyer_email_resend(email_destinataire: str, date_regles_estimee: date) -> tuple[bool, str]:
+    api_key = os.getenv("RESEND_API_KEY", "")
+
+    if not api_key:
+        return False, "Cle RESEND_API_KEY non configuree."
+
+    try:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": "Cyclo <onboarding@resend.dev>",
+                "to": [email_destinataire],
+                "subject": "🌸 Cyclo — Tes règles arrivent dans 2 jours !",
+                "text": (
+                    f"Bonjour,
+
+"
+                    f"Ceci est un petit rappel automatique de Cyclo.
+"
+                    f"Tes prochaines règles sont estimées pour dans 2 jours, le {date_regles_estimee.strftime('%d/%m/%Y')}.
+
+"
+                    f"Prends bien soin de toi !
+L'équipe Cyclo"
+                ),
+            },
+            timeout=10,
+        )
+
+        if response.status_code in (200, 201):
+            return True, "Email envoyé avec succès !"
+        else:
+            return False, f"Échec de l'envoi (code {response.status_code}) : {response.text}"
+
+    except requests.exceptions.RequestException as e:
+        return False, f"Erreur réseau lors de l'envoi : {e}"
+
+
+# --- ROUTES ---
+
 @app.get("/")
 def root():
     return {
-        "message": "API de prédiction de cycle menstruel & analytics",
-        "modele": "LinearRegression (coefficients intégrés)",
-        "version": "3.0"
+        "message": "API Cyclo v5 avec automatisation d'email",
+        "version": "5.0",
     }
 
 
 @app.post("/predict", response_model=PredictionResponse)
-def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
-    dates = sorted(request.dates_dernieres_regles)
+def predict(request: PredictionRequest):
+    cycles = sorted(request.cycles, key=lambda c: c.date_debut)
 
-    if len(dates) < 2:
-        raise HTTPException(
-            status_code=400,
-            detail="Il faut au moins 2 dates de règles pour calculer un premier cycle.",
-        )
+    if len(cycles) < 2:
+        raise HTTPException(status_code=400, detail="Il faut au moins 2 cycles enregistrés.")
 
-    durees_cycles = [(dates[i] - dates[i - 1]).days for i in range(1, len(dates))]
+    for c in cycles:
+        if c.date_fin < c.date_debut:
+            raise HTTPException(status_code=400, detail="Date de fin antérieure à la date de début.")
+
+    dates_debut = [c.date_debut for c in cycles]
+    durees_cycles = [(dates_debut[i] - dates_debut[i - 1]).days for i in range(1, len(dates_debut))]
     durees_valides = [d for d in durees_cycles if 15 <= d <= 60]
 
     if not durees_valides:
-        raise HTTPException(
-            status_code=400,
-            detail="Les dates fournies ne permettent pas de calculer une durée de cycle plausible.",
-        )
+        raise HTTPException(status_code=400, detail="Durées de cycle invalides.")
+
+    durees_regles_reelles = [(c.date_fin - c.date_debut).days + 1 for c in cycles]
+    durees_regles_valides = [d for d in durees_regles_reelles if DUREE_REGLES_MIN <= d <= DUREE_REGLES_MAX]
+    moyenne_duree_regles = float(np.mean(durees_regles_valides)) if durees_regles_valides else 5.0
 
     features = calculer_features_depuis_historique(durees_valides)
-
     duree_predite = predire_duree_cycle(
         features["cycle_precedent"],
         features["moyenne_3_derniers"],
@@ -240,7 +244,7 @@ def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
         features["cycle_number"],
     )
 
-    derniere_date_regles = dates[-1]
+    derniere_date_regles = dates_debut[-1]
     date_prochaines_regles = derniere_date_regles + timedelta(days=round(duree_predite))
 
     jour_ovulation_estime = date_prochaines_regles - timedelta(days=DEFAULT_LUTEAL_PHASE_DAYS)
@@ -251,50 +255,38 @@ def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
         derniere_date_regles=derniere_date_regles,
         date_prochaines_regles=date_prochaines_regles,
         jour_ovulation_estime=jour_ovulation_estime,
-        duree_regles=request.duree_regles,
+        duree_regles=round(moyenne_duree_regles),
     )
 
     aujourdhui = date.today()
     jour_actuel_cycle = (aujourdhui - derniere_date_regles).days + 1
     jours_avant_prochaines_regles = (date_prochaines_regles - aujourdhui).days
+    compte_a_rebours, en_retard = formater_compte_a_rebours(jours_avant_prochaines_regles)
 
     phase_actuelle = phases[0]
     for p in phases:
         if p.date_debut <= aujourdhui <= p.date_fin:
             phase_actuelle = p
             break
-        elif aujourdhui > phases[-1].date_fin:
+    else:
+        if aujourdhui > phases[-1].date_fin:
             phase_actuelle = Phase(
                 nom="Retard potentiel",
                 date_debut=date_prochaines_regles,
                 date_fin=aujourdhui,
                 niveau_fertilite="faible",
-                conseil="Prochaines règles en retard par rapport à la prédiction moyenne."
+                conseil="Prochaines règles en retard par rapport à la prédiction moyenne.",
             )
 
     stats = StatsDashboard(
         moyenne_duree_cycle=round(float(np.mean(durees_valides)), 1),
-        moyenne_duree_regles=float(request.duree_regles),
+        moyenne_duree_regles=round(moyenne_duree_regles, 1),
         ecart_type_cycle=round(float(np.std(durees_valides)), 1),
-        nombre_cycles_enregistres=len(durees_valides)
+        nombre_cycles_enregistres=len(durees_valides),
     )
 
-    if request.envoyer_email_rappel and request.user_email:
-        background_tasks.add_task(
-            envoyer_email_notification,
-            request.user_email,
-            date_prochaines_regles
-        )
-
-    explication_marge = (
-        f"Sur les cycles de test, la prédiction varie en moyenne de {MODEL_MAE_DAYS} jours. "
-        f"Considérez les dates comme le centre d'une fourchette d'environ ±{round(MODEL_MAE_DAYS)} jours."
-    )
-
-    avertissement = (
-        "Cette estimation est statistique et informative uniquement. Elle ne "
-        "constitue pas une méthode contraceptive fiable ni un avis médical."
-    )
+    explication_marge = f"Variation moyenne de {MODEL_MAE_DAYS} jours sur les cycles de test."
+    avertissement = "Estimation informative uniquement. Ne constitue pas un moyen contraceptif."
 
     return PredictionResponse(
         duree_cycle_predite=round(duree_predite, 1),
@@ -304,6 +296,8 @@ def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
         jour_actuel_cycle=jour_actuel_cycle,
         phase_actuelle=phase_actuelle,
         jours_avant_prochaines_regles=jours_avant_prochaines_regles,
+        compte_a_rebours=compte_a_rebours,
+        en_retard=en_retard,
         phases=phases,
         stats=stats,
         nombre_cycles_utilises=len(durees_valides),
@@ -311,3 +305,77 @@ def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
         explication_marge_erreur=explication_marge,
         avertissement=avertissement,
     )
+
+
+@app.post("/send-reminder", response_model=ReminderResponse)
+def send_reminder(request: ReminderRequest):
+    success, message = envoyer_email_resend(request.email, request.date_prochaines_regles)
+    if not success:
+        raise HTTPException(status_code=500, detail=message)
+    return ReminderResponse(success=True, message=message)
+
+
+@app.get("/cron/send-reminders")
+def cron_send_reminders(authorization: Optional[str] = Header(None)):
+    cron_secret = os.getenv("CRON_SECRET", "")
+    if cron_secret and authorization != f"Bearer {cron_secret}":
+        raise HTTPException(status_code=401, detail="Non autorisé.")
+
+    supabase_url = os.getenv("SUPABASE_URL", "")
+    supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+
+    if not supabase_url or not supabase_service_key:
+        raise HTTPException(status_code=500, detail="Variables Supabase manquantes.")
+
+    supabase: Client = create_client(supabase_url, supabase_service_key)
+
+    # Récupérer tous les utilisateurs
+    users_resp = supabase.auth.admin.list_users()
+    users = users_resp if isinstance(users_resp, list) else getattr(users_resp, "users", [])
+
+    cibles_notifiees = []
+    aujourdhui = date.today()
+
+    for u in users:
+        user_id = u.id
+        user_email = u.email
+
+        cycles_resp = supabase.table("cycles").select("date_debut_regles, date_fin_regles").eq("user_id", user_id).order("date_debut_regles", desc=False).execute()
+        cycles_data = cycles_resp.data
+
+        if not cycles_data or len(cycles_data) < 2:
+            continue
+
+        entries = [
+            CycleEntry(date_debut=c["date_debut_regles"], date_fin=c["date_fin_regles"])
+            for c in cycles_data if c.get("date_fin_regles")
+        ]
+
+        if len(entries) < 2:
+            continue
+
+        dates_debut = [c.date_debut for c in entries]
+        durees_cycles = [(dates_debut[i] - dates_debut[i - 1]).days for i in range(1, len(dates_debut))]
+        durees_valides = [d for d in durees_cycles if 15 <= d <= 60]
+
+        if not durees_valides:
+            continue
+
+        features = calculer_features_depuis_historique(durees_valides)
+        duree_predite = predire_duree_cycle(
+            features["cycle_precedent"],
+            features["moyenne_3_derniers"],
+            features["ecart_type_3_derniers"],
+            features["cycle_number"],
+        )
+
+        derniere_date = dates_debut[-1]
+        date_prochaines = derniere_date + timedelta(days=round(duree_predite))
+
+        # Vérifier si l'échéance est exactement dans 2 jours
+        if (date_prochaines - aujourdhui).days == 2:
+            ok, msg = envoyer_email_resend(user_email, date_prochaines)
+            if ok:
+                cibles_notifiees.append(user_email)
+
+    return {"status": "ok", "emails_envoyes": cibles_notifiees}

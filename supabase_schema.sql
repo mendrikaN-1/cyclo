@@ -1,8 +1,12 @@
 -- =====================================================================
--- Table pour stocker les dates de règles et la durée réelle de chaque cycle
+-- Cyclo — Schéma complet de la table `cycles`
 -- À exécuter dans Supabase : SQL Editor > New query > coller > Run
+--
+-- Ce script est sûr à exécuter plusieurs fois (idempotent) : il ne
+-- provoquera pas d'erreur si la table ou les colonnes existent déjà.
 -- =====================================================================
 
+-- 1. Création de la table (si elle n'existe pas déjà)
 create table if not exists cycles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
@@ -11,13 +15,21 @@ create table if not exists cycles (
   created_at timestamp with time zone default now()
 );
 
--- Index pour accélérer les requêtes
+-- 2. Colonne pour la vraie date de fin des règles (v4 : calcul réel de la
+--    durée à partir de deux dates, au lieu d'un chiffre saisi manuellement)
+alter table cycles add column if not exists date_fin_regles date;
+
+-- 3. Index pour accélérer les requêtes "donne-moi les cycles de tel utilisateur"
 create index if not exists cycles_user_id_idx on cycles(user_id);
 
--- Activer Row Level Security (RLS)
+-- =====================================================================
+-- Row Level Security (RLS) : chaque utilisatrice ne peut voir/modifier
+-- QUE ses propres données, jamais celles des autres. Indispensable pour
+-- la confidentialité de données aussi sensibles.
+-- =====================================================================
+
 alter table cycles enable row level security;
 
--- Politiques de sécurité
 drop policy if exists "Les utilisatrices peuvent lire leurs propres cycles" on cycles;
 create policy "Les utilisatrices peuvent lire leurs propres cycles"
   on cycles for select

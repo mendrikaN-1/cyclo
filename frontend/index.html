@@ -9,21 +9,22 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --plum-950: #2b1c33;
-    --plum-800: #4a3358;
-    --plum-600: #6b4a7a;
-    --rose-500: #cb6b82;
-    --rose-400: #d98fa0;
-    --rose-200: #f0c9cf;
-    --rose-100: #fbf0f2;
+    /* --- Thème rose --- */
+    --plum-950: #5c1f3a;
+    --plum-800: #7d2c4d;
+    --plum-600: #a5416b;
+    --rose-500: #d9587f;
+    --rose-400: #e8829e;
+    --rose-200: #f6c3d2;
+    --rose-100: #fdeef2;
     --sage-500: #7a9481;
     --sage-100: #e9f0ea;
     --amber-500: #c98a3e;
     --amber-100: #f7ecd9;
-    --paper: #f8f3f6;
-    --paper-dim: #efe4ea;
-    --ink: #2b1c33;
-    --ink-soft: #6b5a72;
+    --paper: #fdf5f7;
+    --paper-dim: #f6e3e9;
+    --ink: #40202d;
+    --ink-soft: #8a6472;
   }
 
   * { box-sizing: border-box; }
@@ -46,7 +47,7 @@
     background: #fff;
     border-radius: 28px;
     padding: 36px 32px;
-    box-shadow: 0 30px 60px -20px rgba(43, 28, 51, 0.22);
+    box-shadow: 0 30px 60px -20px rgba(92, 31, 58, 0.22);
   }
 
   header { text-align: center; margin-bottom: 24px; }
@@ -88,9 +89,9 @@
     background: var(--paper); padding: 10px 14px; border-radius: 12px;
     margin-bottom: 20px; font-size: 13px; color: var(--ink-soft);
   }
-  .logout-link { color: var(--rose-400); font-weight: 600; cursor: pointer; text-decoration: none; }
+  .logout-link { color: var(--rose-500); font-weight: 600; cursor: pointer; text-decoration: none; }
 
-  /* Widget du jour (Indicateur visuel) */
+  /* Widget du jour */
   .today-widget {
     background: linear-gradient(135deg, var(--plum-950), var(--plum-800));
     color: #fff;
@@ -98,7 +99,10 @@
     padding: 20px;
     margin-bottom: 24px;
     text-align: center;
-    box-shadow: 0 10px 25px -5px rgba(43, 28, 51, 0.3);
+    box-shadow: 0 10px 25px -5px rgba(92, 31, 58, 0.3);
+  }
+  .today-widget.retard {
+    background: linear-gradient(135deg, #7a2b3f, #a5416b);
   }
   .today-badge {
     display: inline-block;
@@ -124,6 +128,17 @@
     font-weight: 500;
     margin-bottom: 12px;
   }
+  .today-countdown-badge {
+    display: inline-block;
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 600;
+    padding: 6px 16px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.15);
+    margin-bottom: 10px;
+  }
+  .today-countdown-badge.retard { background: rgba(255, 255, 255, 0.25); }
   .today-countdown {
     font-size: 13px;
     opacity: 0.9;
@@ -132,86 +147,46 @@
     margin-top: 10px;
   }
 
-  /* Frise Chronologique */
-  .timeline-container {
-    margin-top: 14px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
+  .timeline-container { margin-top: 14px; display: flex; align-items: center; gap: 4px; }
   .timeline-bar {
-    flex: 1;
-    height: 8px;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.2);
-    position: relative;
-    overflow: hidden;
+    flex: 1; height: 8px; border-radius: 4px;
+    background: rgba(255,255,255,0.2); position: relative; overflow: hidden;
   }
-  .timeline-progress {
-    height: 100%;
-    background: var(--rose-400);
-    border-radius: 4px;
-  }
+  .timeline-progress { height: 100%; background: var(--rose-200); border-radius: 4px; }
 
-  /* Dashboard Stats Grid */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 24px;
-  }
-  .stat-card {
-    background: var(--paper);
-    border-radius: 16px;
-    padding: 14px;
-    text-align: center;
-  }
-  .stat-val {
-    font-family: 'Fraunces', serif;
-    font-size: 22px;
-    font-weight: 600;
-    color: var(--plum-950);
-    margin-top: 2px;
-  }
-  .stat-lbl {
-    font-size: 11px;
-    color: var(--ink-soft);
-    font-weight: 500;
-  }
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--paper); border-radius: 16px; padding: 14px; text-align: center; }
+  .stat-val { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; color: var(--plum-950); margin-top: 2px; }
+  .stat-lbl { font-size: 11px; color: var(--ink-soft); font-weight: 500; }
 
-  /* Formulaire Saisie */
+  /* Formulaire */
   .field-group { margin-bottom: 20px; }
   label { display: block; font-size: 13px; font-weight: 600; color: var(--plum-800); margin-bottom: 8px; }
+  .field-hint { font-size: 11px; color: var(--ink-soft); margin: -4px 0 10px; }
 
   .date-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
-    align-items: center;
+    display: flex; gap: 6px; margin-bottom: 8px; align-items: center;
+    background: var(--paper); padding: 8px; border-radius: 14px;
   }
+  .date-pair { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .date-pair-label { font-size: 10px; color: var(--ink-soft); font-weight: 600; padding-left: 2px; }
   input[type="date"] {
-    flex: 2; padding: 10px 12px; border: 1.5px solid var(--paper-dim);
-    border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 13px;
-    color: var(--ink); background: var(--paper);
+    width: 100%; padding: 9px 10px; border: 1.5px solid var(--paper-dim);
+    border-radius: 10px; font-family: 'Inter', sans-serif; font-size: 12.5px;
+    color: var(--ink); background: #fff;
   }
   input[type="date"]:focus { outline: none; border-color: var(--rose-400); }
 
-  .duree-input-wrapper {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+  .duree-badge {
+    font-size: 10px; color: var(--plum-600); font-weight: 700;
+    background: var(--rose-100); padding: 2px 7px; border-radius: 8px;
+    white-space: nowrap; margin-top: 16px;
   }
-  .duree-input-wrapper input {
-    width: 60px;
-    text-align: center;
-    padding: 10px 6px;
-  }
-  .duree-unit { font-size: 11px; color: var(--ink-soft); }
 
   .remove-btn {
     background: none; border: none; color: var(--ink-soft); cursor: pointer;
-    font-size: 18px; width: 32px; border-radius: 10px;
+    font-size: 18px; width: 28px; border-radius: 10px; align-self: flex-start; margin-top: 4px;
   }
   .remove-btn:hover { background: var(--paper-dim); }
 
@@ -222,23 +197,25 @@
   }
   .add-date-btn:hover { border-color: var(--rose-400); color: var(--rose-400); }
 
-  /* Option Notification Email */
+  /* Notification Email */
   .email-notify-box {
     background: var(--rose-100);
     border: 1px solid var(--rose-200);
     border-radius: 14px;
     padding: 12px 14px;
     margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
   }
-  .email-notify-box input[type="checkbox"] {
-    width: 18px; height: 18px; accent-color: var(--plum-800); cursor: pointer;
+  .email-notify-row { display: flex; align-items: center; gap: 8px; }
+  .email-notify-box button {
+    margin-top: 10px; width: 100%; padding: 10px; border: none; border-radius: 10px;
+    background: var(--plum-950); color: #fff; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; font-family: 'Inter', sans-serif;
   }
-  .email-notify-box label {
-    margin: 0; font-size: 12px; color: var(--plum-950); cursor: pointer; font-weight: 500;
-  }
+  .email-notify-box button:hover { background: var(--plum-800); }
+  .email-notify-box button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .email-status { font-size: 11.5px; margin-top: 8px; line-height: 1.5; display: none; }
+  .email-status.ok { color: #3f5744; }
+  .email-status.err { color: #a13333; }
 
   .btn {
     width: 100%; padding: 15px; margin-top: 8px; border: none; border-radius: 14px;
@@ -260,7 +237,6 @@
   }
 
   .result { margin-top: 24px; padding-top: 24px; border-top: 1.5px solid var(--paper-dim); display: none; }
-
   .result-row { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; }
   .result-row + .result-row { border-top: 1px dashed var(--paper-dim); }
   .result-label { font-size: 13px; color: var(--ink-soft); }
@@ -275,20 +251,13 @@
     padding: 10px 12px; background: var(--paper); border-radius: 10px; display: none;
   }
 
-  /* Phases */
   .phases-title { font-size: 13px; font-weight: 600; color: var(--plum-800); margin: 20px 0 10px; }
-  .phase-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 12px; border-radius: 12px; margin-bottom: 8px;
-  }
+  .phase-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 12px; margin-bottom: 8px; }
   .phase-item.faible { background: var(--sage-100); }
   .phase-item.eleve { background: var(--amber-100); }
   .phase-name { font-size: 13px; font-weight: 600; }
   .phase-dates { font-size: 11px; color: var(--ink-soft); }
-  .phase-badge {
-    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
-    text-transform: uppercase; letter-spacing: 0.03em;
-  }
+  .phase-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
   .phase-item.faible .phase-badge { background: var(--sage-500); color: #fff; }
   .phase-item.eleve .phase-badge { background: var(--amber-500); color: #fff; }
   .phase-conseil { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
@@ -333,20 +302,21 @@
       <span class="logout-link" id="logout-btn">Se déconnecter</span>
     </div>
 
-    <!-- 1. INDICATEUR VISUEL DU JOUR -->
+    <!-- Indicateur du jour -->
     <div id="today-widget" class="today-widget hidden">
       <div class="today-badge" id="today-badge">Phase Actuelle</div>
       <div class="today-day" id="today-day">Jour 12</div>
       <div class="today-phase" id="today-phase-name">Phase pré-ovulatoire</div>
+      <div class="today-countdown-badge" id="today-countdown-badge">J-16</div>
       <div class="timeline-container">
         <div class="timeline-bar">
           <div class="timeline-progress" id="timeline-progress" style="width: 40%;"></div>
         </div>
       </div>
-      <div class="today-countdown" id="today-countdown">Prochaines règles estimées dans 16 jours</div>
+      <div class="today-countdown" id="today-countdown">Prochaines règles estimées le 3 août 2026</div>
     </div>
 
-    <!-- 2. DASHBOARD STATISTIQUES -->
+    <!-- Stats -->
     <div id="stats-grid" class="stats-grid hidden">
       <div class="stat-card">
         <div class="stat-lbl">Moyenne Cycle</div>
@@ -366,17 +336,21 @@
       </div>
     </div>
 
-    <!-- 3. FORMULAIRE DE SAISIE -->
+    <!-- Formulaire -->
     <div class="field-group">
-      <label>Historique des règles (Début & Durée réelle)</label>
+      <label>Historique des règles</label>
+      <p class="field-hint">Indique le premier ET le dernier jour de chaque épisode de règles — la durée est calculée automatiquement.</p>
       <div id="dates-container"></div>
-      <button class="add-date-btn" id="add-date-btn" type="button">+ Ajouter une date</button>
+      <button class="add-date-btn" id="add-date-btn" type="button">+ Ajouter un cycle</button>
     </div>
 
-    <!-- 4. NOTIFICATION PAR EMAIL -->
+    <!-- Email -->
     <div class="email-notify-box">
-      <input type="checkbox" id="email-notify-check" checked>
-      <label for="email-notify-check">M'envoyer un email de rappel 2 jours avant mes prochaines règles</label>
+      <div class="email-notify-row">
+        <span style="font-size: 12px; color: var(--plum-950); font-weight: 500;">📧 Recevoir un rappel par email pour tes prochaines règles</span>
+      </div>
+      <button type="button" id="send-reminder-btn">Envoyer le rappel maintenant</button>
+      <p class="email-status" id="email-status"></p>
     </div>
 
     <button class="btn" id="predict-btn" type="button">Calculer ma prédiction</button>
@@ -409,15 +383,12 @@
 </div>
 
 <script>
-  // Configuration Supabase
   const SUPABASE_URL = "https://oabsyhajoxskofewdlsz.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_b_3BUswUC5pBJMoH3IiBPQ_5dhRWC5-";
-// NOUVEAU CODE :
   const API_URL = "https://cyclo-ne4o.vercel.app";
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // Éléments DOM
   const authSection = document.getElementById("auth-section");
   const appSection = document.getElementById("app-section");
   const tabLogin = document.getElementById("tab-login");
@@ -437,11 +408,12 @@
   const resultDiv = document.getElementById("result");
   const infoToggle = document.getElementById("info-toggle");
   const infoText = document.getElementById("info-text");
-  const emailNotifyCheck = document.getElementById("email-notify-check");
+  const sendReminderBtn = document.getElementById("send-reminder-btn");
+  const emailStatus = document.getElementById("email-status");
 
   let authMode = "login";
+  let dernierePredictionDate = null; // date des prochaines règles, mémorisée pour le bouton email
 
-  // Navigation Auth
   tabLogin.onclick = () => {
     authMode = "login";
     tabLogin.classList.add("active");
@@ -519,31 +491,51 @@
     await chargerHistoriqueEtPreremplir();
   }
 
-  // Lignes dynamiques (Date + Durée réelle)
-  function addDateRow(dateVal = "", dureeVal = 5) {
+  // --- Lignes dynamiques : Début + Fin des règles ---
+  function calculerDuree(debut, fin) {
+    if (!debut || !fin) return null;
+    const d1 = new Date(debut + "T00:00:00");
+    const d2 = new Date(fin + "T00:00:00");
+    const diffJours = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+    return diffJours > 0 ? diffJours : null;
+  }
+
+  function addDateRow(dateDebutVal = "", dateFinVal = "") {
     const row = document.createElement("div");
     row.className = "date-row";
 
-    const inputDate = document.createElement("input");
-    inputDate.type = "date";
-    inputDate.value = dateVal;
+    const pairDebut = document.createElement("div");
+    pairDebut.className = "date-pair";
+    const labelDebut = document.createElement("span");
+    labelDebut.className = "date-pair-label";
+    labelDebut.textContent = "Début";
+    const inputDebut = document.createElement("input");
+    inputDebut.type = "date";
+    inputDebut.value = dateDebutVal;
+    pairDebut.appendChild(labelDebut);
+    pairDebut.appendChild(inputDebut);
 
-    const dureeWrapper = document.createElement("div");
-    dureeWrapper.className = "duree-input-wrapper";
+    const pairFin = document.createElement("div");
+    pairFin.className = "date-pair";
+    const labelFin = document.createElement("span");
+    labelFin.className = "date-pair-label";
+    labelFin.textContent = "Fin";
+    const inputFin = document.createElement("input");
+    inputFin.type = "date";
+    inputFin.value = dateFinVal;
+    pairFin.appendChild(labelFin);
+    pairFin.appendChild(inputFin);
 
-    const inputDuree = document.createElement("input");
-    inputDuree.type = "number";
-    inputDuree.min = "1";
-    inputDuree.max = "10";
-    inputDuree.value = dureeVal;
-    inputDuree.title = "Durée des règles en jours";
+    const dureeBadge = document.createElement("span");
+    dureeBadge.className = "duree-badge";
 
-    const unit = document.createElement("span");
-    unit.className = "duree-unit";
-    unit.textContent = "j. règles";
-
-    dureeWrapper.appendChild(inputDuree);
-    dureeWrapper.appendChild(unit);
+    function majDuree() {
+      const d = calculerDuree(inputDebut.value, inputFin.value);
+      dureeBadge.textContent = d ? `${d}j` : "—";
+    }
+    inputDebut.onchange = majDuree;
+    inputFin.onchange = majDuree;
+    majDuree();
 
     const removeBtn = document.createElement("button");
     removeBtn.className = "remove-btn";
@@ -553,24 +545,24 @@
       if (datesContainer.children.length > 2) row.remove();
     };
 
-    row.appendChild(inputDate);
-    row.appendChild(dureeWrapper);
+    row.appendChild(pairDebut);
+    row.appendChild(pairFin);
+    row.appendChild(dureeBadge);
     row.appendChild(removeBtn);
     datesContainer.appendChild(row);
   }
 
-  function resetDateRows(records = [{ date_debut_regles: "", duree_regles: 5 }, { date_debut_regles: "", duree_regles: 5 }]) {
+  function resetDateRows(records = [{ date_debut_regles: "", date_fin_regles: "" }, { date_debut_regles: "", date_fin_regles: "" }]) {
     datesContainer.innerHTML = "";
-    records.forEach(r => addDateRow(r.date_debut_regles, r.duree_regles || 5));
+    records.forEach(r => addDateRow(r.date_debut_regles, r.date_fin_regles || ""));
   }
 
   addDateBtn.onclick = () => addDateRow();
 
-  // Charger historique + recalculer Dashboard
   async function chargerHistoriqueEtPreremplir() {
     const { data, error } = await supabaseClient
       .from("cycles")
-      .select("date_debut_regles, duree_regles")
+      .select("date_debut_regles, date_fin_regles")
       .order("date_debut_regles", { ascending: true });
 
     if (error) {
@@ -581,8 +573,7 @@
 
     if (data && data.length > 0) {
       resetDateRows(data);
-      // Auto-calculer si au moins 2 dates
-      if (data.length >= 2) {
+      if (data.length >= 2 && data.every(r => r.date_fin_regles)) {
         calculerEtAfficherPrediction(false);
       }
     } else {
@@ -590,13 +581,12 @@
     }
   }
 
-  // Sauvegarder dans Supabase
   async function sauvegarderDates(items, userId) {
     await supabaseClient.from("cycles").delete().eq("user_id", userId);
     const lignes = items.map(item => ({
       user_id: userId,
-      date_debut_regles: item.date,
-      duree_regles: item.duree
+      date_debut_regles: item.date_debut,
+      date_fin_regles: item.date_fin,
     }));
     const { error } = await supabaseClient.from("cycles").insert(lignes);
     if (error) console.error("Erreur sauvegarde :", error.message);
@@ -619,6 +609,49 @@
     infoToggle.textContent = visible ? "Qu'est-ce que ça veut dire ? ▾" : "Qu'est-ce que ça veut dire ? ▴";
   };
 
+  // --- Bouton d'envoi du rappel email ---
+  sendReminderBtn.onclick = async () => {
+    emailStatus.style.display = "none";
+
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+
+    if (!dernierePredictionDate) {
+      emailStatus.className = "email-status err";
+      emailStatus.textContent = "Calcule d'abord ta prédiction pour connaître la date à envoyer.";
+      emailStatus.style.display = "block";
+      return;
+    }
+
+    sendReminderBtn.disabled = true;
+    sendReminderBtn.textContent = "Envoi en cours...";
+
+    try {
+      const response = await fetch(`${API_URL}/send-reminder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user.email,
+          date_prochaines_regles: dernierePredictionDate,
+        }),
+      });
+      const data = await response.json();
+
+      emailStatus.className = response.ok ? "email-status ok" : "email-status err";
+      emailStatus.textContent = response.ok
+        ? "✓ " + data.message
+        : "✗ " + (data.detail || "Échec de l'envoi.");
+      emailStatus.style.display = "block";
+    } catch (err) {
+      emailStatus.className = "email-status err";
+      emailStatus.textContent = "✗ Impossible de contacter le serveur.";
+      emailStatus.style.display = "block";
+    } finally {
+      sendReminderBtn.disabled = false;
+      sendReminderBtn.textContent = "Envoyer le rappel maintenant";
+    }
+  };
+
   async function calculerEtAfficherPrediction(showLoading = true) {
     errorMsg.style.display = "none";
 
@@ -627,13 +660,12 @@
 
     const rows = [...datesContainer.querySelectorAll(".date-row")];
     const items = rows.map(r => {
-      const d = r.querySelector("input[type=date]").value;
-      const dur = parseInt(r.querySelector("input[type=number]").value) || 5;
-      return { date: d, duree: dur };
-    }).filter(i => i.date);
+      const inputs = r.querySelectorAll("input[type=date]");
+      return { date_debut: inputs[0].value, date_fin: inputs[1].value };
+    }).filter(i => i.date_debut && i.date_fin);
 
     if (items.length < 2) {
-      if (showLoading) showError("Merci de renseigner au moins 2 dates.");
+      if (showLoading) showError("Merci de renseigner au moins 2 cycles complets (début ET fin).");
       return;
     }
 
@@ -643,18 +675,12 @@
     }
 
     try {
-      const datesOnly = items.map(i => i.date);
-      const dureesList = items.map(i => i.duree);
-      const moyenneDureeRegles = Math.round(dureesList.reduce((a,b)=>a+b,0) / dureesList.length);
-
       const response = await fetch(`${API_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          dates_dernieres_regles: datesOnly,
-          duree_regles: moyenneDureeRegles,
+          cycles: items.map(i => ({ date_debut: i.date_debut, date_fin: i.date_fin })),
           user_email: user.email,
-          envoyer_email_rappel: emailNotifyCheck.checked
         }),
       });
 
@@ -666,18 +692,25 @@
       }
 
       await sauvegarderDates(items, user.id);
+      dernierePredictionDate = data.date_prochaines_regles;
 
-      // 1. Mettre à jour l'indicateur visuel du jour
       const todayWidget = document.getElementById("today-widget");
       todayWidget.classList.remove("hidden");
+      todayWidget.classList.toggle("retard", data.en_retard);
+
       document.getElementById("today-day").textContent = `Jour ${data.jour_actuel_cycle}`;
       document.getElementById("today-phase-name").textContent = data.phase_actuelle.nom;
-      document.getElementById("today-countdown").textContent = `Prochaines règles estimées dans ${data.jours_avant_prochaines_regles} jours (${formatDateFR(data.date_prochaines_regles)})`;
-      
+
+      const countdownBadge = document.getElementById("today-countdown-badge");
+      countdownBadge.textContent = data.compte_a_rebours;
+      countdownBadge.classList.toggle("retard", data.en_retard);
+
+      document.getElementById("today-countdown").textContent =
+        `Prochaines règles estimées le ${formatDateFR(data.date_prochaines_regles)}`;
+
       const pct = Math.min(100, Math.max(0, Math.round((data.jour_actuel_cycle / data.duree_cycle_predite) * 100)));
       document.getElementById("timeline-progress").style.width = `${pct}%`;
 
-      // 2. Mettre à jour les Statistiques
       const statsGrid = document.getElementById("stats-grid");
       statsGrid.classList.remove("hidden");
       document.getElementById("stat-avg-cycle").textContent = `${data.stats.moyenne_duree_cycle}j`;
@@ -685,7 +718,6 @@
       document.getElementById("stat-std-dev").textContent = `±${data.stats.ecart_type_cycle}j`;
       document.getElementById("stat-count").textContent = `${data.stats.nombre_cycles_enregistres}`;
 
-      // 3. Mettre à jour le détail des résultats
       document.getElementById("res-duree").textContent = `${data.duree_cycle_predite} jours`;
       document.getElementById("res-regles").textContent = formatDateFR(data.date_prochaines_regles);
       document.getElementById("res-marge").textContent = `± ${Math.round(data.marge_erreur_jours)} jours`;

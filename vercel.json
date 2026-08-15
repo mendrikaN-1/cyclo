@@ -12,12 +12,26 @@
   ],
   "routes": [
     {
+      "src": "/cron/send-reminders",
+      "dest": "backend/main.py"
+    },
+    {
       "src": "/predict(.*)",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/send-reminder",
       "dest": "backend/main.py"
     },
     {
       "src": "/(.*)",
       "dest": "frontend/$1"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/cron/send-reminders",
+      "schedule": "0 8 * * *"
     }
   ]
 }
