@@ -4,6 +4,7 @@ API FastAPI — Cyclo v5 avec Rappel Automatique d'Email (2 jours avant les règ
 
 from fastapi import FastAPI, HTTPException, Header, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, EmailStr
 from datetime import date, timedelta
 from typing import List, Optional
@@ -204,6 +205,10 @@ def envoyer_email_resend(email_destinataire: str, date_regles_estimee: date) -> 
 
 @app.get("/")
 def root():
+    if os.path.exists("frontend/index.html"):
+        return FileResponse("frontend/index.html")
+    elif os.path.exists("index.html"):
+        return FileResponse("index.html")
     return {
         "message": "API Cyclo v5 avec automatisation d'email",
         "version": "5.0",
