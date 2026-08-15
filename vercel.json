@@ -1,23 +1,7 @@
 {
   "rewrites": [
     {
-      "source": "/cron/send-reminders",
-      "destination": "/api/main.py"
-    },
-    {
-      "source": "/predict",
-      "destination": "/api/main.py"
-    },
-    {
-      "source": "/send-reminder",
-      "destination": "/api/main.py"
-    },
-    {
-      "source": "/docs",
-      "destination": "/api/main.py"
-    },
-    {
-      "source": "/openapi.json",
+      "source": "/(.*)",
       "destination": "/api/main.py"
     }
   ],
