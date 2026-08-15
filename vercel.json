@@ -19,14 +19,6 @@
     {
       "source": "/openapi.json",
       "destination": "/api/main.py"
-    },
-    {
-      "source": "/",
-      "destination": "/frontend/index.html"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/frontend/$1"
     }
   ],
   "crons": [
