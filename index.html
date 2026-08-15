@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyclo — Dashboard & Prédiction de Cycle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    /* --- Thème rose --- */
+    --plum-950: #5c1f3a;
+    --plum-800: #7d2c4d;
+    --plum-600: #a5416b;
+    --rose-500: #d9587f;
+    --rose-400: #e8829e;
+    --rose-200: #f6c3d2;
+    --rose-100: #fdeef2;
+    --sage-500: #7a9481;
+    --sage-100: #e9f0ea;
+    --amber-500: #c98a3e;
+    --amber-100: #f7ecd9;
+    --paper: #fdf5f7;
+    --paper-dim: #f6e3e9;
+    --ink: #40202d;
+    --ink-soft: #8a6472;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 540px;
+    background: #fff;
+    border-radius: 28px;
+    padding: 36px 32px;
+    box-shadow: 0 30px 60px -20px rgba(92, 31, 58, 0.22);
+  }
+
+  header { text-align: center; margin-bottom: 24px; }
+
+  .moon-mark {
+    width: 48px; height: 48px;
+    margin: 0 auto 12px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--rose-400), var(--plum-600));
+    position: relative;
+  }
+  .moon-mark::after {
+    content: ""; position: absolute; top: 6px; left: -8px;
+    width: 48px; height: 48px; border-radius: 50%; background: var(--paper);
+  }
+
+  h1 { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--ink-soft); font-size: 14px; margin: 0; line-height: 1.5; }
+
+  /* Auth */
+  .auth-box { display: flex; flex-direction: column; gap: 12px; }
+  .auth-tabs { display: flex; gap: 8px; margin-bottom: 4px; }
+  .auth-tab {
+    flex: 1; padding: 10px; border-radius: 10px; border: none;
+    background: var(--paper); color: var(--ink-soft); font-weight: 600;
+    font-size: 13px; cursor: pointer; font-family: 'Inter', sans-serif;
+  }
+  .auth-tab.active { background: var(--plum-950); color: #fff; }
+
+  input[type="email"], input[type="password"], input[type="number"] {
+    width: 100%; padding: 12px 14px; border: 1.5px solid var(--paper-dim);
+    border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 14px;
+    color: var(--ink); background: var(--paper);
+  }
+  input:focus { outline: none; border-color: var(--rose-400); }
+
+  .user-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--paper); padding: 10px 14px; border-radius: 12px;
+    margin-bottom: 20px; font-size: 13px; color: var(--ink-soft);
+  }
+  .logout-link { color: var(--rose-500); font-weight: 600; cursor: pointer; text-decoration: none; }
+
+  /* Widget du jour */
+  .today-widget {
+    background: linear-gradient(135deg, var(--plum-950), var(--plum-800));
+    color: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 24px;
+    text-align: center;
+    box-shadow: 0 10px 25px -5px rgba(92, 31, 58, 0.3);
+  }
+  .today-widget.retard {
+    background: linear-gradient(135deg, #7a2b3f, #a5416b);
+  }
+  .today-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.15);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+  }
+  .today-day {
+    font-family: 'Fraunces', serif;
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1.1;
+    margin-bottom: 4px;
+    color: var(--rose-200);
+  }
+  .today-phase {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .today-countdown-badge {
+    display: inline-block;
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 600;
+    padding: 6px 16px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.15);
+    margin-bottom: 10px;
+  }
+  .today-countdown-badge.retard { background: rgba(255, 255, 255, 0.25); }
+  .today-countdown {
+    font-size: 13px;
+    opacity: 0.9;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    padding-top: 10px;
+    margin-top: 10px;
+  }
+
+  .timeline-container { margin-top: 14px; display: flex; align-items: center; gap: 4px; }
+  .timeline-bar {
+    flex: 1; height: 8px; border-radius: 4px;
+    background: rgba(255,255,255,0.2); position: relative; overflow: hidden;
+  }
+  .timeline-progress { height: 100%; background: var(--rose-200); border-radius: 4px; }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--paper); border-radius: 16px; padding: 14px; text-align: center; }
+  .stat-val { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; color: var(--plum-950); margin-top: 2px; }
+  .stat-lbl { font-size: 11px; color: var(--ink-soft); font-weight: 500; }
+
+  /* Formulaire */
+  .field-group { margin-bottom: 20px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--plum-800); margin-bottom: 8px; }
+  .field-hint { font-size: 11px; color: var(--ink-soft); margin: -4px 0 10px; }
+
+  .date-row {
+    display: flex; gap: 6px; margin-bottom: 8px; align-items: center;
+    background: var(--paper); padding: 8px; border-radius: 14px;
+  }
+  .date-pair { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .date-pair-label { font-size: 10px; color: var(--ink-soft); font-weight: 600; padding-left: 2px; }
+  input[type="date"] {
+    width: 100%; padding: 9px 10px; border: 1.5px solid var(--paper-dim);
+    border-radius: 10px; font-family: 'Inter', sans-serif; font-size: 12.5px;
+    color: var(--ink); background: #fff;
+  }
+  input[type="date"]:focus { outline: none; border-color: var(--rose-400); }
+
+  .duree-badge {
+    font-size: 10px; color: var(--plum-600); font-weight: 700;
+    background: var(--rose-100); padding: 2px 7px; border-radius: 8px;
+    white-space: nowrap; margin-top: 16px;
+  }
+
+  .remove-btn {
+    background: none; border: none; color: var(--ink-soft); cursor: pointer;
+    font-size: 18px; width: 28px; border-radius: 10px; align-self: flex-start; margin-top: 4px;
+  }
+  .remove-btn:hover { background: var(--paper-dim); }
+
+  .add-date-btn {
+    width: 100%; padding: 10px; border: 1.5px dashed var(--paper-dim);
+    border-radius: 12px; background: none; color: var(--plum-600); font-size: 13px;
+    font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer; margin-top: 4px;
+  }
+  .add-date-btn:hover { border-color: var(--rose-400); color: var(--rose-400); }
+
+  /* Notification Email */
+  .email-notify-box {
+    background: var(--rose-100);
+    border: 1px solid var(--rose-200);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+  }
+  .email-notify-row { display: flex; align-items: center; gap: 8px; }
+  .email-notify-box button {
+    margin-top: 10px; width: 100%; padding: 10px; border: none; border-radius: 10px;
+    background: var(--plum-950); color: #fff; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; font-family: 'Inter', sans-serif;
+  }
+  .email-notify-box button:hover { background: var(--plum-800); }
+  .email-notify-box button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .email-status { font-size: 11.5px; margin-top: 8px; line-height: 1.5; display: none; }
+  .email-status.ok { color: #3f5744; }
+  .email-status.err { color: #a13333; }
+
+  .btn {
+    width: 100%; padding: 15px; margin-top: 8px; border: none; border-radius: 14px;
+    background: var(--plum-950); color: #fff; font-family: 'Inter', sans-serif;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .btn:hover { background: var(--plum-800); }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .error-msg {
+    background: #fdecec; color: #a13333; padding: 12px 14px; border-radius: 12px;
+    font-size: 13px; margin-top: 16px; display: none;
+  }
+  .success-msg {
+    background: var(--sage-100); color: #3f5744; padding: 12px 14px; border-radius: 12px;
+    font-size: 13px; margin-top: 16px; display: none;
+  }
+
+  .result { margin-top: 24px; padding-top: 24px; border-top: 1.5px solid var(--paper-dim); display: none; }
+  .result-row { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; }
+  .result-row + .result-row { border-top: 1px dashed var(--paper-dim); }
+  .result-label { font-size: 13px; color: var(--ink-soft); }
+  .result-value { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 600; color: var(--plum-950); text-align: right; }
+
+  .info-toggle {
+    font-size: 11px; color: var(--rose-500); cursor: pointer; font-weight: 600;
+    background: none; border: none; padding: 0; margin-top: 2px; font-family: 'Inter', sans-serif;
+  }
+  .info-text {
+    font-size: 12px; color: var(--ink-soft); line-height: 1.6; margin-top: 8px;
+    padding: 10px 12px; background: var(--paper); border-radius: 10px; display: none;
+  }
+
+  .phases-title { font-size: 13px; font-weight: 600; color: var(--plum-800); margin: 20px 0 10px; }
+  .phase-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 12px; margin-bottom: 8px; }
+  .phase-item.faible { background: var(--sage-100); }
+  .phase-item.eleve { background: var(--amber-100); }
+  .phase-name { font-size: 13px; font-weight: 600; }
+  .phase-dates { font-size: 11px; color: var(--ink-soft); }
+  .phase-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .phase-item.faible .phase-badge { background: var(--sage-500); color: #fff; }
+  .phase-item.eleve .phase-badge { background: var(--amber-500); color: #fff; }
+  .phase-conseil { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
+
+  .disclaimer {
+    font-size: 11px; color: var(--ink-soft); text-align: center;
+    margin-top: 18px; line-height: 1.5; background: var(--paper);
+    padding: 10px; border-radius: 12px;
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <header>
+    <div class="moon-mark"></div>
+    <h1>Cyclo</h1>
+    <p class="subtitle">Suivi personnalisé, statistiques et prédiction de cycle.</p>
+  </header>
+
+  <!-- BLOC AUTH -->
+  <div id="auth-section">
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" type="button">Se connecter</button>
+      <button class="auth-tab" id="tab-signup" type="button">Créer un compte</button>
+    </div>
+    <div class="auth-box">
+      <input type="email" id="auth-email" placeholder="Adresse email">
+      <input type="password" id="auth-password" placeholder="Mot de passe (6 caractères min.)">
+      <button class="btn" id="auth-submit-btn" type="button">Se connecter</button>
+    </div>
+    <div class="error-msg" id="auth-error"></div>
+    <div class="success-msg" id="auth-success"></div>
+  </div>
+
+  <!-- BLOC APP -->
+  <div id="app-section" class="hidden">
+    <div class="user-bar">
+      <span id="user-email"></span>
+      <span class="logout-link" id="logout-btn">Se déconnecter</span>
+    </div>
+
+    <!-- Indicateur du jour -->
+    <div id="today-widget" class="today-widget hidden">
+      <div class="today-badge" id="today-badge">Phase Actuelle</div>
+      <div class="today-day" id="today-day">Jour 12</div>
+      <div class="today-phase" id="today-phase-name">Phase pré-ovulatoire</div>
+      <div class="today-countdown-badge" id="today-countdown-badge">J-16</div>
+      <div class="timeline-container">
+        <div class="timeline-bar">
+          <div class="timeline-progress" id="timeline-progress" style="width: 40%;"></div>
+        </div>
+      </div>
+      <div class="today-countdown" id="today-countdown">Prochaines règles estimées le 3 août 2026</div>
+    </div>
+
+    <!-- Stats -->
+    <div id="stats-grid" class="stats-grid hidden">
+      <div class="stat-card">
+        <div class="stat-lbl">Moyenne Cycle</div>
+        <div class="stat-val" id="stat-avg-cycle">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">Moyenne Règles</div>
+        <div class="stat-val" id="stat-avg-period">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">Régularité (Écart)</div>
+        <div class="stat-val" id="stat-std-dev">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">Cycles Suivis</div>
+        <div class="stat-val" id="stat-count">--</div>
+      </div>
+    </div>
+
+    <!-- Formulaire -->
+    <div class="field-group">
+      <label>Historique des règles</label>
+      <p class="field-hint">Indique le premier ET le dernier jour de chaque épisode de règles — la durée est calculée automatiquement.</p>
+      <div id="dates-container"></div>
+      <button class="add-date-btn" id="add-date-btn" type="button">+ Ajouter un cycle</button>
+    </div>
+
+    <!-- Email -->
+    <div class="email-notify-box">
+      <div class="email-notify-row">
+        <span style="font-size: 12px; color: var(--plum-950); font-weight: 500;">📧 Recevoir un rappel par email pour tes prochaines règles</span>
+      </div>
+      <button type="button" id="send-reminder-btn">Envoyer le rappel maintenant</button>
+      <p class="email-status" id="email-status"></p>
+    </div>
+
+    <button class="btn" id="predict-btn" type="button">Calculer ma prédiction</button>
+
+    <div class="error-msg" id="error-msg"></div>
+
+    <div class="result" id="result">
+      <div class="result-row">
+        <span class="result-label">Durée de cycle prédite</span>
+        <span class="result-value" id="res-duree"></span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">Prochaines règles estimées</span>
+        <span class="result-value" id="res-regles"></span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">Marge d'erreur du modèle</span>
+        <span class="result-value" id="res-marge"></span>
+      </div>
+
+      <button class="info-toggle" id="info-toggle" type="button">Qu'est-ce que ça veut dire ? ▾</button>
+      <p class="info-text" id="info-text"></p>
+
+      <p class="phases-title">Phases de ce cycle</p>
+      <div id="phases-container"></div>
+
+      <p class="disclaimer" id="disclaimer"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = "https://oabsyhajoxskofewdlsz.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_b_3BUswUC5pBJMoH3IiBPQ_5dhRWC5-";
+  const API_URL = "https://cyclo-ne4o.vercel.app";
+
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const authSection = document.getElementById("auth-section");
+  const appSection = document.getElementById("app-section");
+  const tabLogin = document.getElementById("tab-login");
+  const tabSignup = document.getElementById("tab-signup");
+  const authSubmitBtn = document.getElementById("auth-submit-btn");
+  const authEmail = document.getElementById("auth-email");
+  const authPassword = document.getElementById("auth-password");
+  const authError = document.getElementById("auth-error");
+  const authSuccess = document.getElementById("auth-success");
+  const userEmailSpan = document.getElementById("user-email");
+  const logoutBtn = document.getElementById("logout-btn");
+
+  const datesContainer = document.getElementById("dates-container");
+  const addDateBtn = document.getElementById("add-date-btn");
+  const predictBtn = document.getElementById("predict-btn");
+  const errorMsg = document.getElementById("error-msg");
+  const resultDiv = document.getElementById("result");
+  const infoToggle = document.getElementById("info-toggle");
+  const infoText = document.getElementById("info-text");
+  const sendReminderBtn = document.getElementById("send-reminder-btn");
+  const emailStatus = document.getElementById("email-status");
+
+  let authMode = "login";
+  let dernierePredictionDate = null; // date des prochaines règles, mémorisée pour le bouton email
+
+  tabLogin.onclick = () => {
+    authMode = "login";
+    tabLogin.classList.add("active");
+    tabSignup.classList.remove("active");
+    authSubmitBtn.textContent = "Se connecter";
+    hideAuthMessages();
+  };
+  tabSignup.onclick = () => {
+    authMode = "signup";
+    tabSignup.classList.add("active");
+    tabLogin.classList.remove("active");
+    authSubmitBtn.textContent = "Créer mon compte";
+    hideAuthMessages();
+  };
+
+  function hideAuthMessages() {
+    authError.style.display = "none";
+    authSuccess.style.display = "none";
+  }
+
+  authSubmitBtn.onclick = async () => {
+    hideAuthMessages();
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
+
+    if (!email || !password) {
+      authError.textContent = "Merci de renseigner un email et un mot de passe.";
+      authError.style.display = "block";
+      return;
+    }
+
+    authSubmitBtn.disabled = true;
+
+    if (authMode === "login") {
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        authError.textContent = "Connexion impossible : " + error.message;
+        authError.style.display = "block";
+      }
+    } else {
+      const { error } = await supabaseClient.auth.signUp({ email, password });
+      if (error) {
+        authError.textContent = "Inscription impossible : " + error.message;
+        authError.style.display = "block";
+      } else {
+        authSuccess.textContent = "Compte créé ! Tu peux maintenant te connecter.";
+        authSuccess.style.display = "block";
+      }
+    }
+    authSubmitBtn.disabled = false;
+  };
+
+  logoutBtn.onclick = async () => {
+    await supabaseClient.auth.signOut();
+  };
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      showApp(session.user);
+    } else {
+      showAuth();
+    }
+  });
+
+  function showAuth() {
+    authSection.classList.remove("hidden");
+    appSection.classList.add("hidden");
+  }
+
+  async function showApp(user) {
+    authSection.classList.add("hidden");
+    appSection.classList.remove("hidden");
+    userEmailSpan.textContent = user.email;
+    resultDiv.style.display = "none";
+    await chargerHistoriqueEtPreremplir();
+  }
+
+  // --- Lignes dynamiques : Début + Fin des règles ---
+  function calculerDuree(debut, fin) {
+    if (!debut || !fin) return null;
+    const d1 = new Date(debut + "T00:00:00");
+    const d2 = new Date(fin + "T00:00:00");
+    const diffJours = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+    return diffJours > 0 ? diffJours : null;
+  }
+
+  function addDateRow(dateDebutVal = "", dateFinVal = "") {
+    const row = document.createElement("div");
+    row.className = "date-row";
+
+    const pairDebut = document.createElement("div");
+    pairDebut.className = "date-pair";
+    const labelDebut = document.createElement("span");
+    labelDebut.className = "date-pair-label";
+    labelDebut.textContent = "Début";
+    const inputDebut = document.createElement("input");
+    inputDebut.type = "date";
+    inputDebut.value = dateDebutVal;
+    pairDebut.appendChild(labelDebut);
+    pairDebut.appendChild(inputDebut);
+
+    const pairFin = document.createElement("div");
+    pairFin.className = "date-pair";
+    const labelFin = document.createElement("span");
+    labelFin.className = "date-pair-label";
+    labelFin.textContent = "Fin";
+    const inputFin = document.createElement("input");
+    inputFin.type = "date";
+    inputFin.value = dateFinVal;
+    pairFin.appendChild(labelFin);
+    pairFin.appendChild(inputFin);
+
+    const dureeBadge = document.createElement("span");
+    dureeBadge.className = "duree-badge";
+
+    function majDuree() {
+      const d = calculerDuree(inputDebut.value, inputFin.value);
+      dureeBadge.textContent = d ? `${d}j` : "—";
+    }
+    inputDebut.onchange = majDuree;
+    inputFin.onchange = majDuree;
+    majDuree();
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "remove-btn";
+    removeBtn.type = "button";
+    removeBtn.textContent = "×";
+    removeBtn.onclick = () => {
+      if (datesContainer.children.length > 2) row.remove();
+    };
+
+    row.appendChild(pairDebut);
+    row.appendChild(pairFin);
+    row.appendChild(dureeBadge);
+    row.appendChild(removeBtn);
+    datesContainer.appendChild(row);
+  }
+
+  function resetDateRows(records = [{ date_debut_regles: "", date_fin_regles: "" }, { date_debut_regles: "", date_fin_regles: "" }]) {
+    datesContainer.innerHTML = "";
+    records.forEach(r => addDateRow(r.date_debut_regles, r.date_fin_regles || ""));
+  }
+
+  addDateBtn.onclick = () => addDateRow();
+
+  async function chargerHistoriqueEtPreremplir() {
+    const { data, error } = await supabaseClient
+      .from("cycles")
+      .select("date_debut_regles, date_fin_regles")
+      .order("date_debut_regles", { ascending: true });
+
+    if (error) {
+      console.error("Erreur chargement :", error.message);
+      resetDateRows();
+      return;
+    }
+
+    if (data && data.length > 0) {
+      resetDateRows(data);
+      if (data.length >= 2 && data.every(r => r.date_fin_regles)) {
+        calculerEtAfficherPrediction(false);
+      }
+    } else {
+      resetDateRows();
+    }
+  }
+
+  async function sauvegarderDates(items, userId) {
+    await supabaseClient.from("cycles").delete().eq("user_id", userId);
+    const lignes = items.map(item => ({
+      user_id: userId,
+      date_debut_regles: item.date_debut,
+      date_fin_regles: item.date_fin,
+    }));
+    const { error } = await supabaseClient.from("cycles").insert(lignes);
+    if (error) console.error("Erreur sauvegarde :", error.message);
+  }
+
+  function formatDateFR(isoDate) {
+    const d = new Date(isoDate + "T00:00:00");
+    return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  }
+
+  function showError(message) {
+    errorMsg.textContent = message;
+    errorMsg.style.display = "block";
+    resultDiv.style.display = "none";
+  }
+
+  infoToggle.onclick = () => {
+    const visible = infoText.style.display === "block";
+    infoText.style.display = visible ? "none" : "block";
+    infoToggle.textContent = visible ? "Qu'est-ce que ça veut dire ? ▾" : "Qu'est-ce que ça veut dire ? ▴";
+  };
+
+  // --- Bouton d'envoi du rappel email ---
+  sendReminderBtn.onclick = async () => {
+    emailStatus.style.display = "none";
+
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+
+    if (!dernierePredictionDate) {
+      emailStatus.className = "email-status err";
+      emailStatus.textContent = "Calcule d'abord ta prédiction pour connaître la date à envoyer.";
+      emailStatus.style.display = "block";
+      return;
+    }
+
+    sendReminderBtn.disabled = true;
+    sendReminderBtn.textContent = "Envoi en cours...";
+
+    try {
+      const response = await fetch(`${API_URL}/send-reminder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user.email,
+          date_prochaines_regles: dernierePredictionDate,
+        }),
+      });
+      const data = await response.json();
+
+      emailStatus.className = response.ok ? "email-status ok" : "email-status err";
+      emailStatus.textContent = response.ok
+        ? "✓ " + data.message
+        : "✗ " + (data.detail || "Échec de l'envoi.");
+      emailStatus.style.display = "block";
+    } catch (err) {
+      emailStatus.className = "email-status err";
+      emailStatus.textContent = "✗ Impossible de contacter le serveur.";
+      emailStatus.style.display = "block";
+    } finally {
+      sendReminderBtn.disabled = false;
+      sendReminderBtn.textContent = "Envoyer le rappel maintenant";
+    }
+  };
+
+  async function calculerEtAfficherPrediction(showLoading = true) {
+    errorMsg.style.display = "none";
+
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+
+    const rows = [...datesContainer.querySelectorAll(".date-row")];
+    const items = rows.map(r => {
+      const inputs = r.querySelectorAll("input[type=date]");
+      return { date_debut: inputs[0].value, date_fin: inputs[1].value };
+    }).filter(i => i.date_debut && i.date_fin);
+
+    if (items.length < 2) {
+      if (showLoading) showError("Merci de renseigner au moins 2 cycles complets (début ET fin).");
+      return;
+    }
+
+    if (showLoading) {
+      predictBtn.disabled = true;
+      predictBtn.textContent = "Calcul en cours...";
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/predict`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cycles: items.map(i => ({ date_debut: i.date_debut, date_fin: i.date_fin })),
+          user_email: user.email,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        showError(data.detail || "Une erreur est survenue.");
+        return;
+      }
+
+      await sauvegarderDates(items, user.id);
+      dernierePredictionDate = data.date_prochaines_regles;
+
+      const todayWidget = document.getElementById("today-widget");
+      todayWidget.classList.remove("hidden");
+      todayWidget.classList.toggle("retard", data.en_retard);
+
+      document.getElementById("today-day").textContent = `Jour ${data.jour_actuel_cycle}`;
+      document.getElementById("today-phase-name").textContent = data.phase_actuelle.nom;
+
+      const countdownBadge = document.getElementById("today-countdown-badge");
+      countdownBadge.textContent = data.compte_a_rebours;
+      countdownBadge.classList.toggle("retard", data.en_retard);
+
+      document.getElementById("today-countdown").textContent =
+        `Prochaines règles estimées le ${formatDateFR(data.date_prochaines_regles)}`;
+
+      const pct = Math.min(100, Math.max(0, Math.round((data.jour_actuel_cycle / data.duree_cycle_predite) * 100)));
+      document.getElementById("timeline-progress").style.width = `${pct}%`;
+
+      const statsGrid = document.getElementById("stats-grid");
+      statsGrid.classList.remove("hidden");
+      document.getElementById("stat-avg-cycle").textContent = `${data.stats.moyenne_duree_cycle}j`;
+      document.getElementById("stat-avg-period").textContent = `${data.stats.moyenne_duree_regles}j`;
+      document.getElementById("stat-std-dev").textContent = `±${data.stats.ecart_type_cycle}j`;
+      document.getElementById("stat-count").textContent = `${data.stats.nombre_cycles_enregistres}`;
+
+      document.getElementById("res-duree").textContent = `${data.duree_cycle_predite} jours`;
+      document.getElementById("res-regles").textContent = formatDateFR(data.date_prochaines_regles);
+      document.getElementById("res-marge").textContent = `± ${Math.round(data.marge_erreur_jours)} jours`;
+
+      infoText.textContent = data.explication_marge_erreur;
+      infoText.style.display = "none";
+
+      const phasesContainer = document.getElementById("phases-container");
+      phasesContainer.innerHTML = "";
+      data.phases.forEach(phase => {
+        const div = document.createElement("div");
+        div.className = `phase-item ${phase.niveau_fertilite}`;
+        div.innerHTML = `
+          <div>
+            <div class="phase-name">${phase.nom}</div>
+            <div class="phase-dates">${formatDateFR(phase.date_debut)} → ${formatDateFR(phase.date_fin)}</div>
+            <div class="phase-conseil">${phase.conseil}</div>
+          </div>
+          <span class="phase-badge">${phase.niveau_fertilite === "eleve" ? "Fertile" : "Faible"}</span>
+        `;
+        phasesContainer.appendChild(div);
+      });
+
+      document.getElementById("disclaimer").textContent = data.avertissement;
+      resultDiv.style.display = "block";
+
+    } catch (err) {
+      showError("Impossible de contacter le serveur. Vérifie que l'API est bien lancée.");
+    } finally {
+      predictBtn.disabled = false;
+      predictBtn.textContent = "Calculer ma prédiction";
+    }
+  }
+
+  predictBtn.onclick = () => calculerEtAfficherPrediction(true);
+</script>
+</body>
+</html>

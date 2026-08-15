@@ -1,28 +1,24 @@
 {
-  "routes": [
+  "rewrites": [
     {
-      "src": "/predict",
-      "dest": "/api/main.py"
+      "source": "/cron/send-reminders",
+      "destination": "/api/main.py"
     },
     {
-      "src": "/send-reminder",
-      "dest": "/api/main.py"
+      "source": "/predict",
+      "destination": "/api/main.py"
     },
     {
-      "src": "/cron/send-reminders",
-      "dest": "/api/main.py"
+      "source": "/send-reminder",
+      "destination": "/api/main.py"
     },
     {
-      "src": "/docs",
-      "dest": "/api/main.py"
+      "source": "/docs",
+      "destination": "/api/main.py"
     },
     {
-      "src": "/openapi.json",
-      "dest": "/api/main.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/$1"
+      "source": "/openapi.json",
+      "destination": "/api/main.py"
     }
   ],
   "crons": [
