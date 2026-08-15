@@ -385,7 +385,7 @@
 <script>
   const SUPABASE_URL = "https://oabsyhajoxskofewdlsz.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_b_3BUswUC5pBJMoH3IiBPQ_5dhRWC5-";
-  const API_URL = "https://cyclo-ne4o.vercel.app";
+  const API_URL = "https://cyclo-teal.vercel.app";
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -412,7 +412,8 @@
   const emailStatus = document.getElementById("email-status");
 
   let authMode = "login";
-  let dernierePredictionDate = null; // date des prochaines règles, mémorisée pour le bouton email
+  let dernierePredictionDate = null;
+  let currentUserId = null;
 
   tabLogin.onclick = () => {
     authMode = "login";
@@ -470,10 +471,16 @@
     await supabaseClient.auth.signOut();
   };
 
-  supabaseClient.auth.onAuthStateChange((event, session) => {
+  supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (session) {
+      // Ignorer les rafraîchissements automatiques de token pour ne pas effacer les champs en cours de saisie
+      if (currentUserId === session.user.id && event === 'TOKEN_REFRESHED') {
+        return;
+      }
+      currentUserId = session.user.id;
       showApp(session.user);
     } else {
+      currentUserId = null;
       showAuth();
     }
   });
@@ -487,8 +494,12 @@
     authSection.classList.add("hidden");
     appSection.classList.remove("hidden");
     userEmailSpan.textContent = user.email;
-    resultDiv.style.display = "none";
-    await chargerHistoriqueEtPreremplir();
+
+    // Ne pré-remplir l'historique que si le conteneur de dates est vide
+    if (datesContainer.children.length === 0) {
+      resultDiv.style.display = "none";
+      await chargerHistoriqueEtPreremplir();
+    }
   }
 
   // --- Lignes dynamiques : Début + Fin des règles ---
