@@ -169,6 +169,13 @@ def envoyer_email_resend(email_destinataire: str, date_regles_estimee: date) -> 
         return False, "Cle RESEND_API_KEY non configuree."
 
     try:
+        text_content = (
+            f"Bonjour,\n\n"
+            f"Ceci est un petit rappel automatique de Cyclo.\n"
+            f"Tes prochaines règles sont estimées pour dans 2 jours, le {date_regles_estimee.strftime('%d/%m/%Y')}.\n\n"
+            f"Prends bien soin de toi !\n"
+            f"L'équipe Cyclo"
+        )
         response = requests.post(
             "https://api.resend.com/emails",
             headers={
@@ -179,18 +186,7 @@ def envoyer_email_resend(email_destinataire: str, date_regles_estimee: date) -> 
                 "from": "Cyclo <onboarding@resend.dev>",
                 "to": [email_destinataire],
                 "subject": "🌸 Cyclo — Tes règles arrivent dans 2 jours !",
-                "text": (
-                    f"Bonjour,
-
-"
-                    f"Ceci est un petit rappel automatique de Cyclo.
-"
-                    f"Tes prochaines règles sont estimées pour dans 2 jours, le {date_regles_estimee.strftime('%d/%m/%Y')}.
-
-"
-                    f"Prends bien soin de toi !
-L'équipe Cyclo"
-                ),
+                "text": text_content,
             },
             timeout=10,
         )
