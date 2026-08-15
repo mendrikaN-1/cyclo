@@ -1,10 +1,11 @@
-# --- Data & ML ---
-pandas
-numpy
-scikit-learn
-joblib
-
 # --- Backend API ---
 fastapi
-uvicorn
-pydantic
+uvicorn[standard]
+pydantic[email]
+numpy
+
+# --- Ré-entraînement du modèle (optionnel, model/train_model.py uniquement) ---
+# Décommente ces lignes seulement si tu veux relancer l'entraînement :
+# pandas
+# scikit-learn
+# joblib

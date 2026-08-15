@@ -1,21 +1,38 @@
+"""
+API FastAPI pour la prédiction de cycle menstruel, fenêtre d'ovulation et phases
+de fertilité.
+
+IMPORTANT — Différence avec les versions précédentes :
+Le modèle (régression linéaire) est maintenant codé EN DUR ci-dessous, sous forme
+de coefficients numériques, au lieu d'être chargé depuis un fichier `.joblib` externe.
+
+Pourquoi ce choix : sur un environnement serverless comme Vercel, charger un fichier
+externe au démarrage (joblib.load) est une source fréquente de plantage silencieux
+(FUNCTION_INVOCATION_FAILED) — soit parce que le fichier n'est pas inclus dans le
+paquet déployé, soit à cause d'une incompatibilité de version entre scikit-learn
+utilisé à l'entraînement et celui installé sur le serveur au moment du déploiement.
+
+Comme notre modèle est une simple régression linéaire (4 coefficients + une
+constante), il est largement aussi simple et beaucoup plus robuste de le
+recalculer nous-mêmes avec une formule mathématique directe. Zéro dépendance
+fichier, zéro risque de désynchronisation de version.
+
+Ces coefficients ont été extraits une fois pour toutes depuis le modèle entraîné
+dans model/train_model.py (voir model/model_metadata.json pour la trace complète).
+"""
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, EmailStr
 from datetime import date, timedelta
 from typing import List, Optional
-import joblib
-import json
+import numpy as np
 import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import numpy as np
-import pandas as pd
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "model", "cycle_model.joblib")
-METADATA_PATH = os.path.join(os.path.dirname(__file__), "..", "model", "model_metadata.json")
-
-app = FastAPI(title="API Prédiction Cycle Menstruel & Analytics", version="2.5")
+app = FastAPI(title="API Prédiction Cycle Menstruel & Analytics", version="3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,13 +41,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = joblib.load(MODEL_PATH)
-with open(METADATA_PATH) as f:
-    metadata = json.load(f)
+# =====================================================================
+# MODÈLE : coefficients de la régression linéaire, extraits une fois
+# depuis model/train_model.py. Ordre des features :
+# [cycle_precedent, moyenne_3_derniers, ecart_type_3_derniers, cycle_number]
+# =====================================================================
+MODEL_COEFFICIENTS = np.array([0.30558796, 0.3133756, 0.03538975, -0.02215476])
+MODEL_INTERCEPT = 11.212948098682684
+MODEL_MAE_DAYS = 2.466  # Erreur moyenne mesurée sur les données de test
 
 DUREE_REGLES_DEFAUT = 5
 SURVIE_SPERMATOZOIDES = 5
 SURVIE_OVULE = 1
+DEFAULT_LUTEAL_PHASE_DAYS = 14
+
+
+def predire_duree_cycle(cycle_precedent, moyenne_3_derniers, ecart_type_3_derniers, cycle_number):
+    """Reproduit exactement model.predict() d'une LinearRegression scikit-learn."""
+    features = np.array([cycle_precedent, moyenne_3_derniers, ecart_type_3_derniers, cycle_number])
+    return float(np.dot(MODEL_COEFFICIENTS, features) + MODEL_INTERCEPT)
+
 
 class PredictionRequest(BaseModel):
     dates_dernieres_regles: List[date] = Field(
@@ -46,6 +76,7 @@ class PredictionRequest(BaseModel):
     user_email: Optional[EmailStr] = None
     envoyer_email_rappel: bool = False
 
+
 class Phase(BaseModel):
     nom: str
     date_debut: date
@@ -53,11 +84,13 @@ class Phase(BaseModel):
     niveau_fertilite: str
     conseil: str
 
+
 class StatsDashboard(BaseModel):
     moyenne_duree_cycle: float
     moyenne_duree_regles: float
     ecart_type_cycle: float
     nombre_cycles_enregistres: int
+
 
 class PredictionResponse(BaseModel):
     duree_cycle_predite: float
@@ -74,8 +107,8 @@ class PredictionResponse(BaseModel):
     explication_marge_erreur: str
     avertissement: str
 
+
 def envoyer_email_notification(email_destinataire: str, date_regles_estimee: date):
-    # Remplacez avec vos identifiants SMTP réels (Mailtrap, SendGrid, Gmail API, etc.)
     smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", 587))
     smtp_user = os.getenv("SMTP_USER", "")
@@ -110,6 +143,7 @@ def envoyer_email_notification(email_destinataire: str, date_regles_estimee: dat
     except Exception as e:
         print(f"Erreur envoi email : {e}")
 
+
 def calculer_features_depuis_historique(durees_cycles: List[float]) -> dict:
     cycle_precedent = durees_cycles[-1]
     trois_derniers = durees_cycles[-3:]
@@ -123,6 +157,7 @@ def calculer_features_depuis_historique(durees_cycles: List[float]) -> dict:
         "ecart_type_3_derniers": ecart_type_3_derniers,
         "cycle_number": cycle_number,
     }
+
 
 def construire_phases(
     derniere_date_regles: date,
@@ -167,13 +202,15 @@ def construire_phases(
 
     return [p for p in phases if p.date_fin >= p.date_debut]
 
+
 @app.get("/")
 def root():
     return {
         "message": "API de prédiction de cycle menstruel & analytics",
-        "modele": metadata["model_name"],
-        "version": "2.5"
+        "modele": "LinearRegression (coefficients intégrés)",
+        "version": "3.0"
     }
+
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
@@ -196,20 +233,17 @@ def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
 
     features = calculer_features_depuis_historique(durees_valides)
 
-    X = pd.DataFrame([{
-        "cycle_precedent": features["cycle_precedent"],
-        "moyenne_3_derniers": features["moyenne_3_derniers"],
-        "ecart_type_3_derniers": features["ecart_type_3_derniers"],
-        "cycle_number": features["cycle_number"],
-    }])
-
-    duree_predite = float(model.predict(X)[0])
+    duree_predite = predire_duree_cycle(
+        features["cycle_precedent"],
+        features["moyenne_3_derniers"],
+        features["ecart_type_3_derniers"],
+        features["cycle_number"],
+    )
 
     derniere_date_regles = dates[-1]
     date_prochaines_regles = derniere_date_regles + timedelta(days=round(duree_predite))
 
-    phase_luteale = metadata["default_luteal_phase_days"]
-    jour_ovulation_estime = date_prochaines_regles - timedelta(days=phase_luteale)
+    jour_ovulation_estime = date_prochaines_regles - timedelta(days=DEFAULT_LUTEAL_PHASE_DAYS)
     date_debut_ovulation = jour_ovulation_estime - timedelta(days=2)
     date_fin_ovulation = jour_ovulation_estime + timedelta(days=2)
 
@@ -220,12 +254,10 @@ def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
         duree_regles=request.duree_regles,
     )
 
-    # Calculs du jour actuel
     aujourdhui = date.today()
     jour_actuel_cycle = (aujourdhui - derniere_date_regles).days + 1
     jours_avant_prochaines_regles = (date_prochaines_regles - aujourdhui).days
 
-    # Trouver la phase actuelle
     phase_actuelle = phases[0]
     for p in phases:
         if p.date_debut <= aujourdhui <= p.date_fin:
@@ -240,7 +272,6 @@ def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
                 conseil="Prochaines règles en retard par rapport à la prédiction moyenne."
             )
 
-    # Stats du Dashboard
     stats = StatsDashboard(
         moyenne_duree_cycle=round(float(np.mean(durees_valides)), 1),
         moyenne_duree_regles=float(request.duree_regles),
@@ -248,7 +279,6 @@ def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
         nombre_cycles_enregistres=len(durees_valides)
     )
 
-    # Déclencher envoi d'email de rappel si demandé
     if request.envoyer_email_rappel and request.user_email:
         background_tasks.add_task(
             envoyer_email_notification,
@@ -256,10 +286,9 @@ def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
             date_prochaines_regles
         )
 
-    mae = metadata["mae_days"]
     explication_marge = (
-        f"Sur les cycles de test, la prédiction varie en moyenne de {mae} jours. "
-        f"Considérez les dates comme le centre d'une fourchette d'environ ±{round(mae)} jours."
+        f"Sur les cycles de test, la prédiction varie en moyenne de {MODEL_MAE_DAYS} jours. "
+        f"Considérez les dates comme le centre d'une fourchette d'environ ±{round(MODEL_MAE_DAYS)} jours."
     )
 
     avertissement = (
@@ -278,7 +307,7 @@ def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
         phases=phases,
         stats=stats,
         nombre_cycles_utilises=len(durees_valides),
-        marge_erreur_jours=mae,
+        marge_erreur_jours=MODEL_MAE_DAYS,
         explication_marge_erreur=explication_marge,
         avertissement=avertissement,
     )
