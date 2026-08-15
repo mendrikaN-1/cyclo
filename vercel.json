@@ -19,6 +19,10 @@
     {
       "source": "/openapi.json",
       "destination": "/api/main.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/frontend/$1"
     }
   ],
   "crons": [
