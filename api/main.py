@@ -205,10 +205,6 @@ def envoyer_email_resend(email_destinataire: str, date_regles_estimee: date) -> 
 
 @app.get("/")
 def root():
-    if os.path.exists("frontend/index.html"):
-        return FileResponse("frontend/index.html")
-    elif os.path.exists("index.html"):
-        return FileResponse("index.html")
     return {
         "message": "API Cyclo v5 avec automatisation d'email",
         "version": "5.0",
