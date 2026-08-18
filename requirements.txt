@@ -1,4 +1,3 @@
-# --- Backend API ---
 fastapi
 uvicorn[standard]
 pydantic[email]

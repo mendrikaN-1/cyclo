@@ -1,7 +1,0 @@
-# --- Backend API ---
-fastapi
-uvicorn[standard]
-pydantic[email]
-numpy
-requests
-supabase
